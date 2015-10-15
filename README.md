@@ -2,7 +2,7 @@
 Slouchy uses your webcam to check if you're slouching and alert you if you are. This project is still in active development and not feature complete.
 
 # Requirements
-You need to install the following using your system's package manager:
+You need to install the following system-wide:
 
 * Python 2.7
 * [Qt4](http://doc.qt.io/qt-4.8/installation.html) and [PyQt4](http://pyqt.sourceforge.net/Docs/PyQt4/installation.html)
@@ -13,15 +13,21 @@ On Debian-based distros the below apt-get should work:
 
 `apt-get install python2.7 python2.7-dev libqt4-core libqt4-dev opencv-data libopencv-core2.4 libopencv-dev python-opencv`
 
-Other dependencies installed via:
+On Mac:
+
+`brew tap homebrew/science`
+
+`brew install python qt pyqt opencv`
+
+For all syatems additional dependencies need to be installed via:
 
 `pip install -r requirements.txt`
 
-# Using - Linux
+# Using
 
 Tweak `slouchy.ini` to your liking.
 
-Run `slouchy.py`
+Run `python slouchy.py`
 
 Sit upright in front of your webcam.
 
