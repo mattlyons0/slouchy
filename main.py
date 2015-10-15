@@ -39,12 +39,18 @@ except ValueError:
   video_device = str(config['MAIN']['video_device'])
 
 cap      = cv2.VideoCapture(video_device)
-camera_x = int(cap.get(3))
-camera_y = int(cap.get(4))
+camera_x = float(cap.get(3))
+camera_y = float(cap.get(4))
 cap.release()
 
-# Create the haar cascade
-faceCascade = cv2.CascadeClassifier(cascade_path)
+# Make a square image so the x and y axes are 1:1 during face detection.
+crop_side_by_pixels = (camera_x - camera_y) / 2
+
+crop_x_left = crop_side_by_pixels
+crop_x_right = camera_x - crop_side_by_pixels
+
+print("crop_x_left =", '{:.2f}'.format(crop_x_left))
+print("crop_x_right =", '{:.2f}'.format(crop_x_right))
 
 # Calculate y_ratio MaybeFace -> MaybeYRatioSquared
 def calculate_y_ratio(MaybeFace):
@@ -55,15 +61,27 @@ def calculate_y_ratio(MaybeFace):
 
   # print("x =", '{:d}'.format(x))
   # print("h =", '{:d}'.format(h))
-  print("y =", '{:d}'.format(y))
-  print("w =", '{:d}'.format(w))
-  print("camera_x =", '{:d}'.format(camera_x))
-  print("camera_y =", '{:d}'.format(camera_y))
+  # print("y =", '{:d}'.format(y))
+  # print("w =", '{:d}'.format(w))
+  print("camera_x =", '{:.4f}'.format(camera_x))
+  print("camera_y =", '{:.4f}'.format(camera_y))
 
   # w_ratio = (camera_x - w) / float(camera_x)
-  y_ratio = y / float(camera_y)
+  # y_ratio = y / float(camera_y)
 
-  print("y_ratio", '{:f}'.format(y_ratio))
+  # Adjust y so it and w are 1:1 with each other.
+  y_adjusted = y * (camera_x / camera_y)
+
+  # w gets larger as face gets closer.
+  # y gets smaller as face gets closer.
+  # Compensating for this.
+  w_adjusted = camera_x - w
+
+  yw_ratio   = w_adjusted / y_adjusted
+
+  print("y_adjusted =", '{:.0f}'.format(y_adjusted))
+  print("w_adjusted =", '{:.0f}'.format(w_adjusted))
+  print("yw_ratio", '{:.4f}'.format(yw_ratio))
 
   # TODO: See if this calculation can be improved
   # c_squared = y**2 + (camera_w - w)**2
@@ -71,7 +89,7 @@ def calculate_y_ratio(MaybeFace):
   # print("w/y =", '{:.4f}'.format(w_y_ratio))
 
   # return Maybe(True, w_y_ratio)
-  return Maybe(True, y_ratio)
+  return Maybe(True, yw_ratio)
 
 def get_face_width(MaybeFace):
   if MaybeFace.success:
@@ -112,6 +130,9 @@ def detect_face(MaybeImage):
 
   # Make image grayscale for processing
   gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+  # Create the haar cascade object
+  faceCascade = cv2.CascadeClassifier(cascade_path)
 
   # Detect faces in the image
   # faces will be an iterable object
