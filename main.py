@@ -26,11 +26,13 @@ result (Bool/Str) If success is true then result will
 # otherwise result is an error message
 Maybe = namedtuple('Maybe', ['success','result'])
 
-config              = ConfigObj('slouchy.ini')
-y_ratio_reference = float(config['MAIN']['y_ratio_reference'])
-allowed_variance    = float(config['MAIN']['allowed_variance'])
-cascade_path        = str(config['MAIN']['cascade_path'])
-camera_delay        = int(config['MAIN']['camera_delay'])
+config                    = ConfigObj('slouchy.ini')
+y_ratio_reference         = float(config['MAIN']['y_ratio_reference'])
+# allowed_variance        = float(config['MAIN']['allowed_variance'])
+cascade_path              = str(config['MAIN']['cascade_path'])
+camera_delay              = int(config['MAIN']['camera_delay'])
+allowed_forward_variance  = float(config['MAIN']['allowed_forward_variance'])
+allowed_backward_variance = float(config['MAIN']['allowed_backward_variance'])
 
 #video_device can be an int or a string, so try int, and if not assume string
 try:
@@ -46,8 +48,9 @@ cap.release()
 # Make a square image so the x and y axes are 1:1 during face detection.
 crop_side_by_pixels = (camera_x - camera_y) / 2
 
-crop_x_left = crop_side_by_pixels
-crop_x_right = camera_x - crop_side_by_pixels
+# These are used for array slicing, so they must be integers.
+crop_x_left  = int(crop_side_by_pixels)
+crop_x_right = int(camera_x - crop_side_by_pixels)
 
 print("crop_x_left =", '{:.2f}'.format(crop_x_left))
 print("crop_x_right =", '{:.2f}'.format(crop_x_right))
@@ -61,8 +64,8 @@ def calculate_y_ratio(MaybeFace):
 
   # print("x =", '{:d}'.format(x))
   # print("h =", '{:d}'.format(h))
-  # print("y =", '{:d}'.format(y))
-  # print("w =", '{:d}'.format(w))
+  print("y =", '{:d}'.format(y))
+  print("w =", '{:d}'.format(w))
   print("camera_x =", '{:.4f}'.format(camera_x))
   print("camera_y =", '{:.4f}'.format(camera_y))
 
@@ -70,26 +73,33 @@ def calculate_y_ratio(MaybeFace):
   # y_ratio = y / float(camera_y)
 
   # Adjust y so it and w are 1:1 with each other.
-  y_adjusted = y * (camera_x / camera_y)
+  # y_adjusted = y * (camera_x / camera_y)
 
   # w gets larger as face gets closer.
   # y gets smaller as face gets closer.
   # Compensating for this.
-  w_adjusted = camera_x - w
+  # w_adjusted = camera_x - w
 
-  yw_ratio   = w_adjusted / y_adjusted
+  # yw_ratio   = y / float(w)
 
-  print("y_adjusted =", '{:.0f}'.format(y_adjusted))
-  print("w_adjusted =", '{:.0f}'.format(w_adjusted))
-  print("yw_ratio", '{:.4f}'.format(yw_ratio))
+  # print("y_adjusted =", '{:.0f}'.format(y_adjusted))
+  # print("w_adjusted =", '{:.0f}'.format(w_adjusted))
+  # print("yw_ratio", '{:.4f}'.format(yw_ratio))
 
   # TODO: See if this calculation can be improved
-  # c_squared = y**2 + (camera_w - w)**2
+  # c_squared = y**2 + (camera_x - w)**2
+  
+  # y gets smaller as face gets closer.
+  # w gets larger as face gets closer.
+  # Compensate for this
+  c_squared = y**2 + (camera_x - w)**2
+
   # w_y_ratio = w_ratio / y_ratio
   # print("w/y =", '{:.4f}'.format(w_y_ratio))
 
+  return Maybe(True, c_squared)
   # return Maybe(True, w_y_ratio)
-  return Maybe(True, yw_ratio)
+  # return Maybe(True, yw_ratio)
 
 def get_face_width(MaybeFace):
   if MaybeFace.success:
@@ -118,7 +128,10 @@ def take_picture(video_device):
 
   cap.release()
 
-  return Maybe(True, image)  
+  # Make the image square.
+  cropped_image = image[0:camera_y, crop_x_left:crop_x_right]
+
+  return Maybe(True, cropped_image)  
 
 # Detect face in an image. Only ever one face, other numbers are an error.
 # MaybeImage -> MaybeFace
@@ -161,7 +174,7 @@ def detect_slouching(MaybeFace):
     return MaybeFace
 
   if MaybeYRatioSquared.success:
-    y_current = MaybeYRatioSquared.result
+    current = MaybeYRatioSquared.result
   else:
     return MaybeYRatioSquared
 
@@ -171,15 +184,21 @@ def detect_slouching(MaybeFace):
   # print("Current posture * allowed_variance:", '{:f}'
   #   .format(float(c_current * allowed_variance)))
 
-  y_min = y_ratio_reference * (1.0 - allowed_variance)
-  y_max = y_ratio_reference * (1.0 + allowed_variance)
+  # y_min = y_ratio_reference * (1.0 - allowed_variance)
+  # y_max = y_ratio_reference * (1.0 + allowed_variance)
 
-  print("y_min", '{:.4f}'.format(y_min))
-  print("y_current", '{:.4f}'.format(y_current))
-  print("y_max", '{:.4f}'.format(y_max))
+  # Allowed variances. 
+  # y_ratio increases as you slouch forward, decreases as you slouch backwards
+  backward_variance = y_ratio_reference * (1.0 - allowed_backward_variance)
+  forward_variance  = y_ratio_reference * (1.0 + allowed_forward_variance)
 
-  # if w_y_min <= w_y_current <= w_y_max:
-  if y_current <= y_max:
+  print("backward_variance", '{:.4f}'.format(backward_variance))
+  print("current", '{:.4f}'.format(current))
+  print("forward_variance", '{:.4f}'.format(forward_variance))
+
+  # if y_current <= y_max:
+  # if y_current >= y_min:
+  if backward_variance <= current <= forward_variance:
     slouching = False
   else:
     slouching = True
